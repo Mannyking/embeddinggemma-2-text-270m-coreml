@@ -37,7 +37,9 @@ has passed. Do not use a smoke test as Core ML evidence.
 - Keep original-model work separate from Core ML conversion work.
 - Name fixed-length variants explicitly, for example `f32-128` and `f32-512`.
 - Update `CONTEXT.md` when evidence, layout, terminology, or limitations change.
-- Update `README.md` only with stable, user-facing commands and conclusions.
+- Keep `README.md` a concise general overview: what the project is about and
+  where to start. Update it only when that overview or entry point changes.
+  Clarify with user if in doubt.
 - Run proportionate checks after edits: at minimum syntax/diff validation for
   documentation or path-only edits, and the relevant export/assessment path for
   numerical or conversion changes.
