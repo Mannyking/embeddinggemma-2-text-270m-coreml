@@ -20,6 +20,7 @@ baselines, packages, and results do not establish evidence for this model.
 
 ## Layout
 
+- `artifacts/INDEX.md`: local navigation to current packages, assessments, and the retrieval run.
 - `README.md`: project overview.
 - `CONTEXT.md`: working context and current status.
 - `AGENTS.md`: working rules.
@@ -38,6 +39,9 @@ baselines, packages, and results do not establish evidence for this model.
 - `artifacts/litert/text-270m/assessments/initial-cpu/`: saved LiteRT-LM comparison, ignored.
 - `artifacts/coreml/f32-512-ios18/initial/`: assessed F32 compression source, ignored.
 - `artifacts/coreml/int4-512/typed-payload-audit/`: int4 candidate and saved comparison, ignored.
+- `scripts/eval/`: pinned NanoNQ download and three-model retrieval evaluation.
+- `datasets/nanonq/`: hash-verified NanoNQ Parquet files and receipt, ignored.
+- `artifacts/eval/nanonq-512/`: input preflight and retrieval runs, ignored.
 
 Add directories as implementation requires them.
 
@@ -240,4 +244,69 @@ compression and assessment directories:
 .venv/bin/python scripts/coreml/assess_f32.py \
   artifacts/coreml/int4-512/another-run/EmbeddingGemma2Int4.mlpackage \
   --comparison-only --output-dir artifacts/coreml/int4-512/another-run/assessments/initial
+```
+
+## NanoNQ Retrieval
+
+NanoNQ (`zeta-alpha-ai/NanoNQ`, CC-BY-4.0) is pinned to dataset revision
+`77540146379abf95df8326a3c5bb9eb21c7146c3`. Its four downloaded files match
+upstream metadata, with SHA-256 hashes in `datasets/nanonq/receipt.json`.
+The optional `eval` dependency pins PyArrow 21.0.0; PyArrow 26 required NumPy 2,
+which is incompatible with the retained Core ML converter environment.
+
+Preflight retained all 50 questions and all 57 positive relevance labels.
+Twenty-three over-limit passages were excluded, leaving 5,012 of 5,035 passages;
+none of those exclusions removed a labeled relevant passage. The same eligible
+set is used for F32 Core ML, int4 Core ML, and LiteRT-LM. Every evaluated
+prompted token sequence agrees between Hugging Face and SentencePiece.
+
+The evaluation uses fixed 512-token inputs, right padding, 768-dimensional
+normalized embeddings, and exact dot-product search. Hit@1/5/10 counts questions
+with at least one labeled relevant passage in the first 1/5/10 results. This
+is not document recall. Empty and over-limit inputs are rejected, never truncated.
+The completed CPU comparison is in `artifacts/eval/nanonq-512/initial-cpu/`;
+`preflight/` retains the input preparation checks. All saved embedding hashes,
+rankings, and Hit@k results were independently rechecked from saved embeddings
+before adding v1.
+
+| Model | Hit@1 | Hit@5 | Hit@10 |
+| --- | --- | --- | --- |
+| Core ML F32 | 35/50 (70%) | 44/50 (88%) | 45/50 (90%) |
+| Core ML int4 | 33/50 (66%) | 43/50 (86%) | 46/50 (92%) |
+| LiteRT int4 | 34/50 (68%) | 43/50 (86%) | 44/50 (88%) |
+| V1 Core ML int4/int8 attention | 36/50 (72%) | 44/50 (88%) | 46/50 (92%) |
+
+These are close results on a small English retrieval subset; one question is
+two percentage points. They do not establish a universal winner. The completed
+run's console output was mirrored to `progress.log` after inference had started.
+
+`scripts/eval/assess_nanonq_v1.py` adds the sibling project's saved
+`int4-512-attention-int8/EmbeddingGemmaInt4AttentionInt8.mlpackage` as a separate
+comparison, preserving the completed v2 run. This v1 candidate uses int8
+attention projections, unlike v2's all-int4 compressed weights. Its pinned
+source revision is `57c266a740f537b4dc058e1b0cda161fd15afa75`; the script verifies
+local source hashes, the baseline receipt link, compressed package evidence,
+and its assessed F32 compression source. It retokenizes the exact same 5,012
+passages and 50 questions using v1's own tokenizer and identical prompt strings.
+All fit (maximum 510 tokens), so no additional exclusions are needed.
+The CPU run completed in `artifacts/eval/nanonq-512/v1-int4-cpu/`, with its own
+`progress.log` from the start. Saved hashes, package inventory, code snapshots,
+embedding shapes/finiteness/norms, and all four models' Hit@k counts were
+rechecked after completion. V1 has the highest Hit@1 here and ties v2 Core ML
+int4 at Hit@10; this small comparison does not demonstrate a v2 retrieval gain.
+V2 Core ML int4 retains similar retrieval counts to F32 while reducing the
+package from about 1.09 GB to 176 MB. Accelerator performance, device behavior,
+and study-app retrieval remain unassessed.
+`v1-int4-inputs-verified/` retains the successful
+input check; `v1-int4-preflight/` retains a failed check caused by differing
+prompt names in the v1 configuration, fixed by mapping to the identical strings.
+
+```sh
+uv sync --locked --extra litert --extra eval
+.venv/bin/python scripts/eval/fetch_nanonq.py  # first download only
+.venv/bin/python scripts/eval/assess_nanonq.py \
+  --output-dir artifacts/eval/nanonq-512/another-run
+.venv/bin/python scripts/eval/assess_nanonq_v1.py \
+  --reference-run artifacts/eval/nanonq-512/initial-cpu \
+  --output-dir artifacts/eval/nanonq-512/another-v1-run
 ```

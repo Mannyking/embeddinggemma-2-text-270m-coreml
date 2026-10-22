@@ -17,3 +17,6 @@ litert = [
     "litert-lm==0.18.1",
     "sentencepiece==0.2.2",
 ]
+eval = [
+    "pyarrow==21.0.0",
+]
