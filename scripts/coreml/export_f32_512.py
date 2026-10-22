@@ -59,7 +59,7 @@ class Embedder(torch.nn.Module):
         return features["sentence_embedding"]
 
 
-def run(output, baseline, report):
+def run(output, baseline, report, minimum_deployment_target=ct.target.iOS17):
     metadata, names, arrays, expected, _, links = load_baseline(baseline)
     report.update(links)
     report["fixture_order"] = names
@@ -131,7 +131,7 @@ def run(output, baseline, report):
                 ct.TensorType(name="attention_mask", shape=(1, LENGTH), dtype=np.int32)],
         outputs=[ct.TensorType(name="embedding", dtype=np.float32)],
         compute_precision=ct.precision.FLOAT32, compute_units=ct.ComputeUnit.CPU_ONLY,
-        minimum_deployment_target=ct.target.iOS17,
+        minimum_deployment_target=minimum_deployment_target,
         skip_model_load=True,
     )
     converted.short_description = "EmbeddingGemma 2 text-only float32, fixed 512 prompted tokens"
@@ -159,6 +159,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True, help="Fresh export directory")
     parser.add_argument("--baseline", type=Path, default=BASELINE)
+    parser.add_argument("--minimum-deployment-target", choices=("ios17", "ios18"), default="ios17",
+                        help="Use ios18 for the float32 source of int4 weight compression")
     args = parser.parse_args()
     output = args.output_dir.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -167,14 +169,16 @@ def main():
         **environment(), "uv_lock_sha256": sha256(ROOT / "uv.lock"),
         "script_sha256": sha256(Path(__file__)), "evidence_script_sha256": sha256(Path(__file__).with_name("evidence.py")),
         "precision": "float32", "input_dtype": "int32", "input_shape": [1, LENGTH],
-        "output_dtype": "float32", "output_shape": [1, 768], "minimum_deployment_target": "iOS17/macOS14",
+        "output_dtype": "float32", "output_shape": [1, 768],
+        "minimum_deployment_target": "iOS18/macOS15" if args.minimum_deployment_target == "ios18" else "iOS17/macOS14",
         "wrapper_tolerances": {"atol": 1e-5, "rtol": 1e-4},
         "conversion_note": "Core ML Tools 9.0 does not list Torch 2.14 as tested; saved-package assessment is required.",
     }
     try:
         for src in (Path(__file__), Path(__file__).with_name("evidence.py"), ROOT / "uv.lock"):
             shutil.copyfile(src, output / src.name)
-        run(output, args.baseline.expanduser().resolve(), report)
+        target = ct.target.iOS18 if args.minimum_deployment_target == "ios18" else ct.target.iOS17
+        run(output, args.baseline.expanduser().resolve(), report, minimum_deployment_target=target)
     except Exception as error:
         report.update(status="failed", error=f"{type(error).__name__}: {error}", traceback=traceback.format_exc())
         raise

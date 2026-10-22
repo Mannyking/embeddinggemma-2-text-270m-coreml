@@ -8,6 +8,8 @@ downloaded and hash-verified. The user-run original-model smoke test passed on
 2026-10-17. The saved float32 512-token Core ML package has passed CPU-only
 parity assessment on all 13 fixtures. The LiteRT-LM int4 text bundle has also
 been compared on CPU; it does not meet float32 parity.
+An int4 Core ML weight-compression candidate has also been saved and compared;
+it remains a lossy comparison candidate rather than a parity-equivalent export.
 
 The official processor requires Pillow and Torchvision at initialization even
 for text-only use. Both are explicit locked dependencies. Offline processor
@@ -34,6 +36,8 @@ baselines, packages, and results do not establish evidence for this model.
 - `models/embeddinggemma-2-text-270m-litertlm/`: CPU/GPU bundle and model card, ignored.
 - `models/receipts/embeddinggemma-2-text-270m-litertlm.json`: bundle revision and hashes.
 - `artifacts/litert/text-270m/assessments/initial-cpu/`: saved LiteRT-LM comparison, ignored.
+- `artifacts/coreml/f32-512-ios18/initial/`: assessed F32 compression source, ignored.
+- `artifacts/coreml/int4-512/typed-payload-audit/`: int4 candidate and saved comparison, ignored.
 
 Add directories as implementation requires them.
 
@@ -190,4 +194,50 @@ uv sync --locked --extra litert
 .venv/bin/python scripts/litert/fetch_model.py
 .venv/bin/python scripts/litert/assess_litertlm.py \
   --output-dir artifacts/litert/text-270m/assessments/another-run
+```
+
+## Int4 Core ML
+
+`export_f32_512.py --minimum-deployment-target ios18` creates the separate iOS 18/
+macOS 15 F32 source needed for int4 compression. Its saved CPU assessment in
+`artifacts/coreml/f32-512-ios18/initial/assessments/cpu-native/` passed all 13
+fixtures, with maximum absolute error `2.68e-7` against padded reference outputs.
+The original iOS 17 package and all earlier evidence remain intact.
+
+`scripts/coreml/export_int4_512.py` requires this exact source package's export
+report and passing F32 assessment, checks baseline and model hashes, then
+compresses all 218 linear weights and the token-embedding gather to signed int4.
+It uses symmetric post-training quantization with blocks of 32 and retains
+float32 activations, normalization, and output. All attention projections are
+int4; there are no int8 exceptions. The saved graph audit verifies all 219
+target weights have INT4 payloads. This is weight compression, not int4
+activation arithmetic, and differs from LiteRT's per-channel QAT.
+
+The candidate `typed-payload-audit/EmbeddingGemma2Int4.mlpackage` is 175,906,044
+bytes (about 176 MB), versus about 1.09 GB for F32 and 165 MB for LiteRT-LM.
+Its `assessments/cpu-native/` comparison found finite, normalized outputs on all
+13 fixtures (maximum norm error `9.03e-8`). Short-fixture cosine versus padded
+F32 ranged from `0.970456` to `0.987123`; exact 511/512-token cosine was
+`0.970443`/`0.970600`. Maximum absolute error was `0.031531`. Mars retrieval
+retained the baseline order, with scores Mars `0.878820`, Venus `0.673135`,
+Saturn `0.665574`. None of this establishes broader retrieval quality or device
+performance. It does not meet F32 parity; no lossy acceptance profile is approved.
+
+`assess_f32.py --comparison-only` records lossy metrics using the same baseline
+and package hash checks without claiming parity acceptance. The default F32
+mode still requires a float32 export and enforces the original fixed profile.
+The first compression attempt's report is preserved in `int4-512/initial/`;
+its audit needed to handle inline typed payloads as well as named constants.
+
+For new runs, export and assess an iOS 18 F32 source first, then choose fresh
+compression and assessment directories:
+
+```sh
+.venv/bin/python scripts/coreml/export_int4_512.py \
+  --source-package artifacts/coreml/f32-512-ios18/initial/EmbeddingGemma2F32.mlpackage \
+  --source-assessment artifacts/coreml/f32-512-ios18/initial/assessments/cpu-native/report.json \
+  --output-dir artifacts/coreml/int4-512/another-run
+.venv/bin/python scripts/coreml/assess_f32.py \
+  artifacts/coreml/int4-512/another-run/EmbeddingGemma2Int4.mlpackage \
+  --comparison-only --output-dir artifacts/coreml/int4-512/another-run/assessments/initial
 ```
