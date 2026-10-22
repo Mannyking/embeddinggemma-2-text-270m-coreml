@@ -6,7 +6,8 @@ and smoke-script input guards have been checked. The official checkpoint is
 downloaded and hash-verified. The user-run original-model smoke test passed on
 2026-10-16. A saved CPU float32 baseline passed capture validation on
 2026-10-17. The saved float32 512-token Core ML package has passed CPU-only
-parity assessment on all 13 fixtures.
+parity assessment on all 13 fixtures. The LiteRT-LM int4 text bundle has also
+been compared on CPU; it does not meet float32 parity.
 
 The official processor requires Pillow and Torchvision at initialization even
 for text-only use. Both are explicit locked dependencies. Offline processor
@@ -29,6 +30,10 @@ baselines, packages, and results do not establish evidence for this model.
 - `artifacts/baseline-f32-512/initial/`: saved baseline and provenance snapshots, ignored.
 - `scripts/coreml/`: float32 export, saved-package assessment, and shared evidence checks.
 - `artifacts/coreml/f32-512/numpy1/`: exported package and CPU assessment, ignored.
+- `scripts/litert/`: pinned LiteRT-LM download and descriptive baseline comparison.
+- `models/embeddinggemma-2-text-270m-litertlm/`: CPU/GPU bundle and model card, ignored.
+- `models/receipts/embeddinggemma-2-text-270m-litertlm.json`: bundle revision and hashes.
+- `artifacts/litert/text-270m/assessments/initial-cpu/`: saved LiteRT-LM comparison, ignored.
 
 Add directories as implementation requires them.
 
@@ -142,4 +147,47 @@ New runs require fresh output directories:
 .venv/bin/python scripts/coreml/assess_f32.py \
   artifacts/coreml/f32-512/another-run/EmbeddingGemma2F32.mlpackage \
   --output-dir artifacts/coreml/f32-512/another-run/assessments/initial
+```
+
+## LiteRT-LM Comparison
+
+The CPU/GPU bundle from
+`litert-community/embeddinggemma-2-text-270m-litert-lm` is pinned to revision
+`9be6e8b90982095dc05c2bd162e4b954ee4dbac7`. Its size is 164,626,432 bytes
+(about 165 MB); both it and the downloaded model card match upstream hashes.
+The model card describes int4 per-channel QAT for transformer and embeddings.
+
+The optional `litert` dependencies lock LiteRT-LM/API/builder 0.18.1 and
+SentencePiece 0.2.2. The comparison uses the actual LiteRT-LM EmbeddingEngine
+on CPU with four threads, min/max input signatures fixed to 512, explicit BOS/EOS
+insertion, 768-dimensional normalized output, and overflow set to ERROR.
+
+The embedded tokenizer matches the original tokenizer.model hash and reproduces
+every baseline token sequence exactly. Reconstructed right-padding masks match
+the saved masks; the native runtime constructs its own mask from token length.
+The Python API accepts text, so native input buffers are not directly supplied
+or dumped. This interface limitation and the upstream mask implementation link
+are recorded in the report. Unpacked bundle sections and their hashes are retained.
+
+All 13 outputs were finite and unit-normalized (maximum norm error `5.14e-7`).
+Short-fixture cosine against the padded float32 baseline ranged from `0.973561`
+to `0.992890`; 511/512-token cosine was `0.958677`/`0.959037`. Maximum absolute
+error was `0.043492`. None of the fixtures met the existing F32 profile.
+Mars remained first (`0.880536`), but Saturn (`0.686730`) narrowly overtook
+Venus (`0.685942`), reversing the baseline's lower two ranks. Six input-guard
+checks and two native 513-token rejection checks passed. This is a descriptive
+quantized-model comparison, not an approved lossy-quality or device-performance
+claim. A broader retrieval evaluation would be needed to judge acceptability.
+
+The report links the source receipt, bundle, baseline, script/lock snapshots,
+verified inputs, and saved predictions. Core ML and original-model artifacts
+remain unchanged. `inspection/` and `probe-cache/` contain preliminary bundle
+inspection and one-query runtime checks, separate from the saved assessment.
+
+```sh
+uv sync --locked --extra litert
+# Download only if the pinned local bundle and receipt do not already exist:
+.venv/bin/python scripts/litert/fetch_model.py
+.venv/bin/python scripts/litert/assess_litertlm.py \
+  --output-dir artifacts/litert/text-270m/assessments/another-run
 ```

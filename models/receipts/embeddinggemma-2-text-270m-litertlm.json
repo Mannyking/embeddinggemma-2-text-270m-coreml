@@ -1,0 +1,19 @@
+{
+  "repository": "litert-community/embeddinggemma-2-text-270m-litert-lm",
+  "revision": "9be6e8b90982095dc05c2bd162e4b954ee4dbac7",
+  "verification": "Local content matches pinned Hugging Face API metadata (LFS SHA-256 or Git blob SHA-1); metadata is not independently authenticated.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 11237,
+      "sha256": "0383b0b45232bd6c92c842f42ad7c8ef9364acdc18b61712efb805a9261f0348",
+      "download_etag": "829570b7f4ca864ba9d201bfd5715e54f8f185ac"
+    },
+    {
+      "path": "embeddinggemma-2-text-270m.litertlm",
+      "bytes": 164626432,
+      "sha256": "2d079ee2f6f066b1f368e8d7c819f55214eaef1d0513b312321901f30ab286fb",
+      "download_etag": "2d079ee2f6f066b1f368e8d7c819f55214eaef1d0513b312321901f30ab286fb"
+    }
+  ]
+}

@@ -11,3 +11,9 @@ dependencies = [
     "torchvision==0.29.1",
     "transformers==5.20.1",
 ]
+
+[project.optional-dependencies]
+litert = [
+    "litert-lm==0.18.1",
+    "sentencepiece==0.2.2",
+]
