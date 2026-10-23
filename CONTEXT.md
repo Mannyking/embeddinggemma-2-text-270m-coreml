@@ -1,6 +1,6 @@
 # Working Context
 
-Text-only EmbeddingGemma 2 Core ML experiment. Work only in this repo; v1 is
+Text-only EmbeddingGemma 2 (270M) Core ML experiment. Work only in this repo; v1 is
 an independent project. Python 3.11 and dependencies are pinned in `uv.lock`.
 Model weights, datasets, and generated artifacts are not version controlled.
 
@@ -41,7 +41,8 @@ must be checked; these directories are ignored by Git.
 Core ML assessments sit under each package's `assessments/initial/`. Reports,
 predictions, hashes, and code snapshots contain the detailed evidence.
 `artifacts/INDEX.md` provides local navigation. Historical paths inside reports
-are unchanged; the local `artifacts/archive/RELOCATION.md` records their mapping.
+are unchanged; the local `artifacts/archive/RELOCATION.md` records their mapping,
+including the former checkout name `embeddinggemma2-coreml`.
 
 ## Verified State and Limits
 

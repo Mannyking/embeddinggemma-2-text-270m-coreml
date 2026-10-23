@@ -1,7 +1,7 @@
-# EmbeddingGemma 2 → Core ML
+# EmbeddingGemma 2 Text 270M → Core ML
 
-Experiment to convert Google's official `embeddinggemma-2` checkpoint into
-a Core ML text embedder for on-device retrieval.
+Experiment to convert the 270M text component of Google's official
+`embeddinggemma-2` checkpoint into a Core ML embedder for on-device retrieval.
 
 ## The Idea
 

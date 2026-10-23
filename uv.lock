@@ -182,7 +182,7 @@ nvtx = [
 ]
 
 [[package]]
-name = "embeddinggemma2-coreml"
+name = "embeddinggemma-2-text-270m-coreml"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [
