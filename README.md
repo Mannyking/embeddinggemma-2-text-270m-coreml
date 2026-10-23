@@ -3,6 +3,9 @@
 Experiment to convert the 270M text component of Google's official
 `embeddinggemma-2` checkpoint into a Core ML embedder for on-device retrieval.
 
+Download the packages and shared tokenizer from
+[Mannyking/embeddinggemma-2-text-270m-coreml](https://huggingface.co/Mannyking/embeddinggemma-2-text-270m-coreml).
+
 ## The Idea
 
 Establish that the full embedding pipeline converts correctly, then check

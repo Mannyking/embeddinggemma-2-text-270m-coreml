@@ -3,6 +3,8 @@
 Text-only EmbeddingGemma 2 (270M) Core ML experiment. Work only in this repo; v1 is
 an independent project. Python 3.11 and dependencies are pinned in `uv.lock`.
 Model weights, datasets, and generated artifacts are not version controlled.
+Published packages and shared tokenizer: [Hugging Face](https://huggingface.co/Mannyking/embeddinggemma-2-text-270m-coreml),
+with `f32-ios15/`, `f32-ios18/`, `int4-ios18/`, and `tokenizer/` under Apache 2.0.
 
 ## Workflow
 
