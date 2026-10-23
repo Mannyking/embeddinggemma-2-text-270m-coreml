@@ -119,7 +119,9 @@ To capture another run, choose a fresh directory:
 int32 `input_ids` and `attention_mask`, and returns a normalized `(1, 768)`
 float32 `embedding`. Task prompting and tokenization stay outside the package.
 Callers must reject empty or over-512-token prompted text and use right padding.
-The deployment target is iOS 17/macOS 14; device behavior has not been assessed.
+The deployment target is iOS 15/macOS 12; device behavior has not been assessed.
+`export_f32_512.py` defaults to this target, with `ios18` retained for the
+separate F32 compression source.
 
 Export rechecked the pinned receipt, every local model hash, saved baseline
 hashes, and original-pipeline outputs. Wrapper and trace errors were zero on all
@@ -136,6 +138,17 @@ error at most `1e-4`. Reports link package, baseline, source receipt, and script
 hashes; predictions and source/lock snapshots are retained. This establishes
 recorded-fixture parity on macOS CPU only, not performance or accelerator placement.
 
+At the user's request, the regular F32 run was replaced in place after a new
+iOS 15 export and saved-package assessment passed on all 13 fixtures. The new
+ML Program uses specification version 6 and is 1,090,234,344 bytes. Its saved
+predictions are exactly equal to the previous iOS 17 run on those fixtures,
+including Mars scores `0.902646`, `0.686095`, and `0.667635` in the same order.
+The previous `artifacts/coreml/f32-512/numpy1/` contents were moved intact to
+`/tmp/embeddinggemma2-f32-ios15-u2a3ugnc/previous-ios17/` as a temporary holder;
+their contents and hashes were checked before and after replacement. The
+existing path now contains the new iOS 15 package, export report, snapshots,
+and passing `assessments/cpu-native/` report. No reports were edited by hand.
+
 Conversion uses Core ML Tools 9.0 and NumPy 1.26.4. NumPy 2.4 caused the
 converter's scalar cast to fail. Torch 2.14.1 is outside Core ML Tools' tested
 versions; the saved-package results above are the actual conversion evidence.
@@ -143,9 +156,10 @@ The wrapper expresses media-placeholder replacement with `where` to avoid an
 unsupported `__or__` operation in the composite model.
 
 Earlier failed export reports remain in `initial/`, `mask-elision/`, and
-`text-backbone/` under `artifacts/coreml/f32-512/`. The accepted package's
-`assessments/initial/` records a sandbox compilation failure; `cpu-native/` is
-the successful run with access to Core ML's native temporary directories.
+`text-backbone/` under `artifacts/coreml/f32-512/`. The previous iOS 17 run's
+`assessments/initial/`, now in the temporary holder, records a sandbox compilation
+failure; its `cpu-native/` was the successful assessment. The current iOS 15
+run has a passing `cpu-native/` assessment.
 
 New runs require fresh output directories:
 
@@ -206,7 +220,8 @@ uv sync --locked --extra litert
 macOS 15 F32 source needed for int4 compression. Its saved CPU assessment in
 `artifacts/coreml/f32-512-ios18/initial/assessments/cpu-native/` passed all 13
 fixtures, with maximum absolute error `2.68e-7` against padded reference outputs.
-The original iOS 17 package and all earlier evidence remain intact.
+The prior regular iOS 17 run is retained in the temporary holder described above.
+The iOS 18 F32 source and its int4 compression chain remain intact.
 
 `scripts/coreml/export_int4_512.py` requires this exact source package's export
 report and passing F32 assessment, checks baseline and model hashes, then
@@ -268,6 +283,9 @@ The completed CPU comparison is in `artifacts/eval/nanonq-512/initial-cpu/`;
 `preflight/` retains the input preparation checks. All saved embedding hashes,
 rankings, and Hit@k results were independently rechecked from saved embeddings
 before adding v1.
+The recorded F32 NanoNQ results use the unchanged iOS 18 compression source.
+Those values and their evidence links were retained when the regular F32
+package was replaced by the iOS 15 export; NanoNQ was not rerun.
 
 | Model | Hit@1 | Hit@5 | Hit@10 |
 | --- | --- | --- | --- |
@@ -280,13 +298,13 @@ These are close results on a small English retrieval subset; one question is
 two percentage points. They do not establish a universal winner. The completed
 run's console output was mirrored to `progress.log` after inference had started.
 
-`scripts/eval/assess_nanonq_v1.py` adds the sibling project's saved
+The retired `scripts/eval/assess_nanonq_v1.py` compared the sibling project's saved
 `int4-512-attention-int8/EmbeddingGemmaInt4AttentionInt8.mlpackage` as a separate
 comparison, preserving the completed v2 run. This v1 candidate uses int8
 attention projections, unlike v2's all-int4 compressed weights. Its pinned
-source revision is `57c266a740f537b4dc058e1b0cda161fd15afa75`; the script verifies
+source revision is `57c266a740f537b4dc058e1b0cda161fd15afa75`; the script verified
 local source hashes, the baseline receipt link, compressed package evidence,
-and its assessed F32 compression source. It retokenizes the exact same 5,012
+and its assessed F32 compression source. It retokenized the exact same 5,012
 passages and 50 questions using v1's own tokenizer and identical prompt strings.
 All fit (maximum 510 tokens), so no additional exclusions are needed.
 The CPU run completed in `artifacts/eval/nanonq-512/v1-int4-cpu/`, with its own
@@ -301,12 +319,20 @@ and study-app retrieval remain unassessed.
 input check; `v1-int4-preflight/` retains a failed check caused by differing
 prompt names in the v1 configuration, fixed by mapping to the identical strings.
 
+The live cross-repository evaluator has been removed now that v1 has its own
+NanoNQ evaluator. The completed v1 comparison above, including its script
+snapshots and recorded historical paths, remains intact. New runs in each repo
+prepare the pinned dataset using that repo's own tokenizer and local models;
+neither evaluator requires a sibling checkout or another repo's run directory.
+Compare saved reports only after checking that eligible record IDs and relevance
+labels agree; tokenizers can select different subsets at the same length limit.
+V1's independent preparation was checked against its completed run: texts,
+record IDs, prompts, relevance labels, and 512/128-token input tensors matched
+exactly, and all saved embeddings reproduced their scores without new inference.
+
 ```sh
 uv sync --locked --extra litert --extra eval
 .venv/bin/python scripts/eval/fetch_nanonq.py  # first download only
 .venv/bin/python scripts/eval/assess_nanonq.py \
   --output-dir artifacts/eval/nanonq-512/another-run
-.venv/bin/python scripts/eval/assess_nanonq_v1.py \
-  --reference-run artifacts/eval/nanonq-512/initial-cpu \
-  --output-dir artifacts/eval/nanonq-512/another-v1-run
 ```
