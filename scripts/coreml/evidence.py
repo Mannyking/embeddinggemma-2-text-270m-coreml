@@ -9,7 +9,7 @@ import platform
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = ROOT / "artifacts/baseline-f32-512/initial"
+BASELINE = ROOT / "artifacts/baseline-f32-512"
 RECEIPT = ROOT / "models/receipts/embeddinggemma-2.json"
 MODEL = ROOT / "models/embeddinggemma-2"
 REVISION = "914f7f89142e33e77833254d9c9b90c3cef7303b"

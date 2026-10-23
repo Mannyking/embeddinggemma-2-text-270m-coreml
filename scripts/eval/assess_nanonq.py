@@ -27,9 +27,9 @@ sys.path.insert(0, str(ROOT / "scripts/litert"))
 from evidence import BASELINE, MODEL, RECEIPT, file_hashes, load_baseline, sha256, verify_local_model, write_report
 from assess_litertlm import DESTINATION, FILENAME, verify_bundle
 
-F32 = ROOT / "artifacts/coreml/f32-512-ios18/initial/EmbeddingGemma2F32.mlpackage"
-INT4 = ROOT / "artifacts/coreml/int4-512/typed-payload-audit/EmbeddingGemma2Int4.mlpackage"
-LITERT_ASSESSMENT = ROOT / "artifacts/litert/text-270m/assessments/initial-cpu/report.json"
+F32 = ROOT / "artifacts/coreml/f32-512-ios18/EmbeddingGemma2F32.mlpackage"
+INT4 = ROOT / "artifacts/coreml/int4-512/EmbeddingGemma2Int4.mlpackage"
+LITERT_ASSESSMENT = ROOT / "artifacts/litert/text-270m/assessments/initial/report.json"
 
 
 def verify_dataset():
@@ -47,7 +47,7 @@ def verify_dataset():
 
 def coreml_provenance(package, label, baseline_links):
     export_path = package.parent / "export-report.json"
-    assessment_path = package.parent / "assessments/cpu-native/report.json"
+    assessment_path = package.parent / "assessments/initial/report.json"
     export = json.loads(export_path.read_text())
     assessment = json.loads(assessment_path.read_text())
     hashes = file_hashes(package)
