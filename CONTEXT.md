@@ -52,6 +52,9 @@ are unchanged; the local `artifacts/archive/RELOCATION.md` records their mapping
   int4 weights with float32 activations; the package is about 176 MB.
 - Core ML int4 and LiteRT were compared with the baseline and evaluated for
   retrieval. Neither meets F32 parity; no lossy acceptance profile is approved.
+- A single-projection feasibility probe preserved LiteRT's exact int4 weights
+  and scales in Core ML. Full-model QAT transfer remains unimplemented;
+  exported scaling differences and the remaining parameters need mapping.
 - NanoNQ used the iOS 18 F32 source, Core ML int4, and LiteRT on 50 questions
   and 5,012 passages. Its 512-token filter excluded 23 passages, removing no
   labeled relevant passages. Scores remain unchanged after the iOS 15 export.
