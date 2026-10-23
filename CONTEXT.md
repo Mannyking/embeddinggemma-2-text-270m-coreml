@@ -1,338 +1,62 @@
 # Working Context
 
-Text-only EmbeddingGemma 2 conversion experiment. Python 3.11 dependencies are
-locked in `uv.lock` and installed in `.venv`. Model-class imports, CLI behavior,
-and smoke-script input guards have been checked. The official checkpoint is
-downloaded and hash-verified. The user-run original-model smoke test passed on
-2026-10-16. A saved CPU float32 baseline passed capture validation on
-2026-10-17. The saved float32 512-token Core ML package has passed CPU-only
-parity assessment on all 13 fixtures. The LiteRT-LM int4 text bundle has also
-been compared on CPU; it does not meet float32 parity.
-An int4 Core ML weight-compression candidate has also been saved and compared;
-it remains a lossy comparison candidate rather than a parity-equivalent export.
+Text-only EmbeddingGemma 2 Core ML experiment. Work only in this repo; v1 is
+an independent project. Python 3.11 and dependencies are pinned in `uv.lock`.
+Model weights, datasets, and generated artifacts are not version controlled.
 
-The official processor requires Pillow and Torchvision at initialization even
-for text-only use. Both are explicit locked dependencies. Offline processor
-loading and text tokenization passed after adding them.
+## Workflow
 
-The sibling `embeddinggemma-coreml` project is a workflow reference. Its
-baselines, packages, and results do not establish evidence for this model.
+- `scripts/original/`: smoke test and original-model baseline capture.
+- `scripts/coreml/`: F32 export, int4 compression, saved-package assessment.
+- `scripts/litert/`: pinned bundle download and baseline comparison.
+- `scripts/eval/`: pinned NanoNQ download and retrieval evaluation.
 
-## Layout
-
-- `artifacts/INDEX.md`: local navigation to current packages, assessments, and the retrieval run.
-- `README.md`: project overview.
-- `CONTEXT.md`: working context and current status.
-- `AGENTS.md`: working rules.
-- `.gitignore`: excludes local environments, weights, and generated artifacts.
-- `pyproject.toml`, `uv.lock`, `.python-version`: original-model and conversion environment.
-- `scripts/original/smoke_test_f32.py`: offline CPU float32 text smoke test.
-- `scripts/original/capture_baseline_f32.py`: verified original-model baseline capture.
-- `models/embeddinggemma-2/`: official local checkpoint, ignored by Git.
-- `models/receipts/embeddinggemma-2.json`: pinned revision and local file hashes.
-- `artifacts/baseline-f32-512/initial/`: saved baseline and provenance snapshots, ignored.
-- `scripts/coreml/`: float32 export, saved-package assessment, and shared evidence checks.
-- `artifacts/coreml/f32-512/numpy1/`: exported package and CPU assessment, ignored.
-- `scripts/litert/`: pinned LiteRT-LM download and descriptive baseline comparison.
-- `models/embeddinggemma-2-text-270m-litertlm/`: CPU/GPU bundle and model card, ignored.
-- `models/receipts/embeddinggemma-2-text-270m-litertlm.json`: bundle revision and hashes.
-- `artifacts/litert/text-270m/assessments/initial-cpu/`: saved LiteRT-LM comparison, ignored.
-- `artifacts/coreml/f32-512-ios18/initial/`: assessed F32 compression source, ignored.
-- `artifacts/coreml/int4-512/typed-payload-audit/`: int4 candidate and saved comparison, ignored.
-- `scripts/eval/`: pinned NanoNQ download and three-model retrieval evaluation.
-- `datasets/nanonq/`: hash-verified NanoNQ Parquet files and receipt, ignored.
-- `artifacts/eval/nanonq-512/`: input preflight and retrieval runs, ignored.
-
-Add directories as implementation requires them.
-
-Model source: `google/embeddinggemma-2` at revision
-`914f7f89142e33e77833254d9c9b90c3cef7303b`. All 14 downloaded files
-(about 1.53 GB) match upstream file metadata: LFS SHA-256 for weights and Git
-blob SHA-1 for other files. The generated receipt records SHA-256 for each file;
-upstream metadata is not independently authenticated. The unchanged checkpoint
-includes multimodal weights; the smoke script disables unused encoders at load.
-
-The smoke test expects a local official checkpoint at `models/embeddinggemma-2/`
-(or `--model-path`). It loads the model with vision/audio disabled and eager
-attention, uses the checkpoint's `SearchQuery` and `Document` prompts, rejects
-empty or over-limit prompted text without truncation, and checks 768-dimensional
-finite unit vectors and Mars retrieval ranking. It prints results only; it
-creates no baseline or Core ML evidence.
-
-The reported smoke run used CPU float32, eager attention, and right padding.
-Prompted token lengths were 18 for the query and 16/14/13 for the documents.
-All four embeddings passed shape, finiteness, and unit-norm checks. Retrieval
-ranked Mars (`0.902646`), Venus (`0.686095`), then Saturn (`0.667635`). These
-terminal-only results are an original-model sanity check, not a saved baseline
-or Core ML assessment.
-
-For the same query, document texts, and prompt strings, the sibling project's
-saved original-model baseline (`../embeddinggemma-coreml/artifacts/baseline-f32/metadata.json`)
-records these cosine scores alongside the user-reported EmbeddingGemma 2 run:
-
-| Document | EmbeddingGemma 1 baseline | EmbeddingGemma 2 smoke run |
-| --- | --- | --- |
-| Mars | 0.645413 | 0.902646 |
-| Venus | 0.259444 | 0.686095 |
-| Saturn | 0.232551 | 0.667635 |
-
-The ranking is unchanged. The Mars-to-Venus margin is approximately 0.385969
-for the old model and 0.216551 for the new one. Absolute cosine scales differ
-between models; higher scores do not establish better retrieval quality.
-
-With the official checkpoint available locally:
-
-```sh
-uv sync --locked
-.venv/bin/python scripts/original/smoke_test_f32.py
-```
-
-The saved baseline contains 13 text fixtures: the Mars example, paraphrases,
-unrelated and short text, French/Arabic/Japanese examples, and exact 511/512-token
-documents. Each has unpadded and right-padded `(1, 512)` inputs and a normalized
-float32 `(1, 768)` embedding. The selected variant limit is 512 prompted tokens;
-this does not assess the model's full context window.
-
-Capture verified all 14 model file hashes, checked the official pipeline against
-public `encode()` (maximum absolute difference `0`), and checked padding
-invariance (maximum absolute difference approximately `2.55e-7`). Six rejection
-checks passed: empty, whitespace-only, and exact 513-token inputs for each task
-prompt. Mars retrieval ranking was unchanged. Saved array checks, provenance
-hashes, and refusal to overwrite existing evidence also passed.
-
-`fixtures.npz` stores the exact tensor inputs and embeddings; `metadata.json`
-records prompts, texts, lengths, feature metadata, environment, tolerances, and
-hash links. Byte-for-byte snapshots of the receipt, capture script, and lockfile
-are retained alongside them. This is original-model evidence; Core ML parity
-requires the separate saved-package assessment below.
-
-To capture another run, choose a fresh directory:
-
-```sh
-.venv/bin/python scripts/original/capture_baseline_f32.py \
-  --output artifacts/baseline-f32-512/another-run
-```
-
-## Float32 Core ML
-
-`artifacts/coreml/f32-512/numpy1/EmbeddingGemma2F32.mlpackage` accepts `(1, 512)`
-int32 `input_ids` and `attention_mask`, and returns a normalized `(1, 768)`
-float32 `embedding`. Task prompting and tokenization stay outside the package.
-Callers must reject empty or over-512-token prompted text and use right padding.
-The deployment target is iOS 15/macOS 12; device behavior has not been assessed.
-`export_f32_512.py` defaults to this target, with `ios18` retained for the
-separate F32 compression source.
-
-Export rechecked the pinned receipt, every local model hash, saved baseline
-hashes, and original-pipeline outputs. Wrapper and trace errors were zero on all
-13 fixed-input fixtures. The wrapper preserves upstream bidirectional full/local
-masks (including elided all-zero masks), media-placeholder-to-PAD behavior,
-per-layer inputs, projection, pooling, and normalization.
-
-The saved package is about 1.09 GB. Its CPU-only assessment passed `f32-parity`
-in `assessments/cpu-native/`: maximum absolute error `2.68e-7` against padded
-reference embeddings and `3.61e-7` against unpadded ones, maximum norm error
-`9.21e-8`, and unchanged Mars retrieval ranking. The profile matches the first
-project: elementwise `atol=1e-4`, `rtol=1e-3`, cosine at least `0.9999`, and norm
-error at most `1e-4`. Reports link package, baseline, source receipt, and script
-hashes; predictions and source/lock snapshots are retained. This establishes
-recorded-fixture parity on macOS CPU only, not performance or accelerator placement.
-
-At the user's request, the regular F32 run was replaced in place after a new
-iOS 15 export and saved-package assessment passed on all 13 fixtures. The new
-ML Program uses specification version 6 and is 1,090,234,344 bytes. Its saved
-predictions are exactly equal to the previous iOS 17 run on those fixtures,
-including Mars scores `0.902646`, `0.686095`, and `0.667635` in the same order.
-The previous `artifacts/coreml/f32-512/numpy1/` contents were moved intact to
-`/tmp/embeddinggemma2-f32-ios15-u2a3ugnc/previous-ios17/` as a temporary holder;
-their contents and hashes were checked before and after replacement. The
-existing path now contains the new iOS 15 package, export report, snapshots,
-and passing `assessments/cpu-native/` report. No reports were edited by hand.
-
-Conversion uses Core ML Tools 9.0 and NumPy 1.26.4. NumPy 2.4 caused the
-converter's scalar cast to fail. Torch 2.14.1 is outside Core ML Tools' tested
-versions; the saved-package results above are the actual conversion evidence.
-The wrapper expresses media-placeholder replacement with `where` to avoid an
-unsupported `__or__` operation in the composite model.
-
-Earlier failed export reports remain in `initial/`, `mask-elision/`, and
-`text-backbone/` under `artifacts/coreml/f32-512/`. The previous iOS 17 run's
-`assessments/initial/`, now in the temporary holder, records a sandbox compilation
-failure; its `cpu-native/` was the successful assessment. The current iOS 15
-run has a passing `cpu-native/` assessment.
-
-New runs require fresh output directories:
-
-```sh
-.venv/bin/python scripts/coreml/export_f32_512.py \
-  --output-dir artifacts/coreml/f32-512/another-run
-.venv/bin/python scripts/coreml/assess_f32.py \
-  artifacts/coreml/f32-512/another-run/EmbeddingGemma2F32.mlpackage \
-  --output-dir artifacts/coreml/f32-512/another-run/assessments/initial
-```
-
-## LiteRT-LM Comparison
-
-The CPU/GPU bundle from
-`litert-community/embeddinggemma-2-text-270m-litert-lm` is pinned to revision
-`9be6e8b90982095dc05c2bd162e4b954ee4dbac7`. Its size is 164,626,432 bytes
-(about 165 MB); both it and the downloaded model card match upstream hashes.
-The model card describes int4 per-channel QAT for transformer and embeddings.
-
-The optional `litert` dependencies lock LiteRT-LM/API/builder 0.18.1 and
-SentencePiece 0.2.2. The comparison uses the actual LiteRT-LM EmbeddingEngine
-on CPU with four threads, min/max input signatures fixed to 512, explicit BOS/EOS
-insertion, 768-dimensional normalized output, and overflow set to ERROR.
-
-The embedded tokenizer matches the original tokenizer.model hash and reproduces
-every baseline token sequence exactly. Reconstructed right-padding masks match
-the saved masks; the native runtime constructs its own mask from token length.
-The Python API accepts text, so native input buffers are not directly supplied
-or dumped. This interface limitation and the upstream mask implementation link
-are recorded in the report. Unpacked bundle sections and their hashes are retained.
-
-All 13 outputs were finite and unit-normalized (maximum norm error `5.14e-7`).
-Short-fixture cosine against the padded float32 baseline ranged from `0.973561`
-to `0.992890`; 511/512-token cosine was `0.958677`/`0.959037`. Maximum absolute
-error was `0.043492`. None of the fixtures met the existing F32 profile.
-Mars remained first (`0.880536`), but Saturn (`0.686730`) narrowly overtook
-Venus (`0.685942`), reversing the baseline's lower two ranks. Six input-guard
-checks and two native 513-token rejection checks passed. This is a descriptive
-quantized-model comparison, not an approved lossy-quality or device-performance
-claim. A broader retrieval evaluation would be needed to judge acceptability.
-
-The report links the source receipt, bundle, baseline, script/lock snapshots,
-verified inputs, and saved predictions. Core ML and original-model artifacts
-remain unchanged. `inspection/` and `probe-cache/` contain preliminary bundle
-inspection and one-query runtime checks, separate from the saved assessment.
-
-```sh
-uv sync --locked --extra litert
-# Download only if the pinned local bundle and receipt do not already exist:
-.venv/bin/python scripts/litert/fetch_model.py
-.venv/bin/python scripts/litert/assess_litertlm.py \
-  --output-dir artifacts/litert/text-270m/assessments/another-run
-```
-
-## Int4 Core ML
-
-`export_f32_512.py --minimum-deployment-target ios18` creates the separate iOS 18/
-macOS 15 F32 source needed for int4 compression. Its saved CPU assessment in
-`artifacts/coreml/f32-512-ios18/initial/assessments/cpu-native/` passed all 13
-fixtures, with maximum absolute error `2.68e-7` against padded reference outputs.
-The prior regular iOS 17 run is retained in the temporary holder described above.
-The iOS 18 F32 source and its int4 compression chain remain intact.
-
-`scripts/coreml/export_int4_512.py` requires this exact source package's export
-report and passing F32 assessment, checks baseline and model hashes, then
-compresses all 218 linear weights and the token-embedding gather to signed int4.
-It uses symmetric post-training quantization with blocks of 32 and retains
-float32 activations, normalization, and output. All attention projections are
-int4; there are no int8 exceptions. The saved graph audit verifies all 219
-target weights have INT4 payloads. This is weight compression, not int4
-activation arithmetic, and differs from LiteRT's per-channel QAT.
-
-The candidate `typed-payload-audit/EmbeddingGemma2Int4.mlpackage` is 175,906,044
-bytes (about 176 MB), versus about 1.09 GB for F32 and 165 MB for LiteRT-LM.
-Its `assessments/cpu-native/` comparison found finite, normalized outputs on all
-13 fixtures (maximum norm error `9.03e-8`). Short-fixture cosine versus padded
-F32 ranged from `0.970456` to `0.987123`; exact 511/512-token cosine was
-`0.970443`/`0.970600`. Maximum absolute error was `0.031531`. Mars retrieval
-retained the baseline order, with scores Mars `0.878820`, Venus `0.673135`,
-Saturn `0.665574`. None of this establishes broader retrieval quality or device
-performance. It does not meet F32 parity; no lossy acceptance profile is approved.
-
-`assess_f32.py --comparison-only` records lossy metrics using the same baseline
-and package hash checks without claiming parity acceptance. The default F32
-mode still requires a float32 export and enforces the original fixed profile.
-The first compression attempt's report is preserved in `int4-512/initial/`;
-its audit needed to handle inline typed payloads as well as named constants.
-
-For new runs, export and assess an iOS 18 F32 source first, then choose fresh
-compression and assessment directories:
-
-```sh
-.venv/bin/python scripts/coreml/export_int4_512.py \
-  --source-package artifacts/coreml/f32-512-ios18/initial/EmbeddingGemma2F32.mlpackage \
-  --source-assessment artifacts/coreml/f32-512-ios18/initial/assessments/cpu-native/report.json \
-  --output-dir artifacts/coreml/int4-512/another-run
-.venv/bin/python scripts/coreml/assess_f32.py \
-  artifacts/coreml/int4-512/another-run/EmbeddingGemma2Int4.mlpackage \
-  --comparison-only --output-dir artifacts/coreml/int4-512/another-run/assessments/initial
-```
-
-## NanoNQ Retrieval
-
-NanoNQ (`zeta-alpha-ai/NanoNQ`, CC-BY-4.0) is pinned to dataset revision
-`77540146379abf95df8326a3c5bb9eb21c7146c3`. Its four downloaded files match
-upstream metadata, with SHA-256 hashes in `datasets/nanonq/receipt.json`.
-The optional `eval` dependency pins PyArrow 21.0.0; PyArrow 26 required NumPy 2,
-which is incompatible with the retained Core ML converter environment.
-
-Preflight retained all 50 questions and all 57 positive relevance labels.
-Twenty-three over-limit passages were excluded, leaving 5,012 of 5,035 passages;
-none of those exclusions removed a labeled relevant passage. The same eligible
-set is used for F32 Core ML, int4 Core ML, and LiteRT-LM. Every evaluated
-prompted token sequence agrees between Hugging Face and SentencePiece.
-
-The evaluation uses fixed 512-token inputs, right padding, 768-dimensional
-normalized embeddings, and exact dot-product search. Hit@1/5/10 counts questions
-with at least one labeled relevant passage in the first 1/5/10 results. This
-is not document recall. Empty and over-limit inputs are rejected, never truncated.
-The completed CPU comparison is in `artifacts/eval/nanonq-512/initial-cpu/`;
-`preflight/` retains the input preparation checks. All saved embedding hashes,
-rankings, and Hit@k results were independently rechecked from saved embeddings
-before adding v1.
-The recorded F32 NanoNQ results use the unchanged iOS 18 compression source.
-Those values and their evidence links were retained when the regular F32
-package was replaced by the iOS 15 export; NanoNQ was not rerun.
-
-| Model | Hit@1 | Hit@5 | Hit@10 |
-| --- | --- | --- | --- |
-| Core ML F32 | 35/50 (70%) | 44/50 (88%) | 45/50 (90%) |
-| Core ML int4 | 33/50 (66%) | 43/50 (86%) | 46/50 (92%) |
-| LiteRT int4 | 34/50 (68%) | 43/50 (86%) | 44/50 (88%) |
-| V1 Core ML int4/int8 attention | 36/50 (72%) | 44/50 (88%) | 46/50 (92%) |
-
-These are close results on a small English retrieval subset; one question is
-two percentage points. They do not establish a universal winner. The completed
-run's console output was mirrored to `progress.log` after inference had started.
-
-The retired `scripts/eval/assess_nanonq_v1.py` compared the sibling project's saved
-`int4-512-attention-int8/EmbeddingGemmaInt4AttentionInt8.mlpackage` as a separate
-comparison, preserving the completed v2 run. This v1 candidate uses int8
-attention projections, unlike v2's all-int4 compressed weights. Its pinned
-source revision is `57c266a740f537b4dc058e1b0cda161fd15afa75`; the script verified
-local source hashes, the baseline receipt link, compressed package evidence,
-and its assessed F32 compression source. It retokenized the exact same 5,012
-passages and 50 questions using v1's own tokenizer and identical prompt strings.
-All fit (maximum 510 tokens), so no additional exclusions are needed.
-The CPU run completed in `artifacts/eval/nanonq-512/v1-int4-cpu/`, with its own
-`progress.log` from the start. Saved hashes, package inventory, code snapshots,
-embedding shapes/finiteness/norms, and all four models' Hit@k counts were
-rechecked after completion. V1 has the highest Hit@1 here and ties v2 Core ML
-int4 at Hit@10; this small comparison does not demonstrate a v2 retrieval gain.
-V2 Core ML int4 retains similar retrieval counts to F32 while reducing the
-package from about 1.09 GB to 176 MB. Accelerator performance, device behavior,
-and study-app retrieval remain unassessed.
-`v1-int4-inputs-verified/` retains the successful
-input check; `v1-int4-preflight/` retains a failed check caused by differing
-prompt names in the v1 configuration, fixed by mapping to the identical strings.
-
-The live cross-repository evaluator has been removed now that v1 has its own
-NanoNQ evaluator. The completed v1 comparison above, including its script
-snapshots and recorded historical paths, remains intact. New runs in each repo
-prepare the pinned dataset using that repo's own tokenizer and local models;
-neither evaluator requires a sibling checkout or another repo's run directory.
-Compare saved reports only after checking that eligible record IDs and relevance
-labels agree; tokenizers can select different subsets at the same length limit.
-V1's independent preparation was checked against its completed run: texts,
-record IDs, prompts, relevance labels, and 512/128-token input tensors matched
-exactly, and all saved embeddings reproduced their scores without new inference.
+With the local model available, start with:
 
 ```sh
 uv sync --locked --extra litert --extra eval
-.venv/bin/python scripts/eval/fetch_nanonq.py  # first download only
-.venv/bin/python scripts/eval/assess_nanonq.py \
-  --output-dir artifacts/eval/nanonq-512/another-run
+.venv/bin/python scripts/original/smoke_test_f32.py
 ```
+
+Model identities and hashes live in `models/receipts/`; dataset provenance is
+in `datasets/nanonq/receipt.json`. Export and assessment options are documented
+by their `--help` output.
+
+## Local Artifacts
+
+All paths are relative to the repository root. Availability on a new machine
+must be checked; these directories are ignored by Git.
+
+| Purpose | Location |
+| --- | --- |
+| Original checkpoint and LiteRT bundle | `models/` |
+| Original-model reference inputs and outputs | `artifacts/baseline-f32-512/` |
+| Regular F32 package, iOS 15/macOS 12 | `artifacts/coreml/f32-512/` |
+| F32 compression source, iOS 18/macOS 15 | `artifacts/coreml/f32-512-ios18/` |
+| Int4 package, iOS 18/macOS 15 | `artifacts/coreml/int4-512/` |
+| LiteRT comparison | `artifacts/litert/text-270m/assessments/initial/` |
+| NanoNQ results | `artifacts/evaluations/nanonq-512/initial/` |
+| Earlier attempts and historical comparisons | `artifacts/archive/` |
+
+Core ML assessments sit under each package's `assessments/initial/`. Reports,
+predictions, hashes, and code snapshots contain the detailed evidence.
+`artifacts/INDEX.md` provides local navigation. Historical paths inside reports
+are unchanged; the local `artifacts/archive/RELOCATION.md` records their mapping.
+
+## Verified State and Limits
+
+- Both F32 packages passed saved-artifact parity against 13 original-model
+  fixtures on macOS CPU. The regular iOS 15 export matched its prior iOS 17
+  outputs exactly on those fixtures.
+- Int4 compression requires the separately assessed iOS 18 F32 source. It uses
+  int4 weights with float32 activations; the package is about 176 MB.
+- Core ML int4 and LiteRT were compared with the baseline and evaluated for
+  retrieval. Neither meets F32 parity; no lossy acceptance profile is approved.
+- NanoNQ used the iOS 18 F32 source, Core ML int4, and LiteRT on 50 questions
+  and 5,012 passages. Its 512-token filter excluded 23 passages, removing no
+  labeled relevant passages. Scores remain unchanged after the iOS 15 export.
+- Core ML takes `(1, 512)` int32 token IDs and masks and returns a normalized
+  `(1, 768)` float32 embedding. Prompting/tokenization are external. LiteRT-LM
+  accepts prompted text; native token/mask buffers are runtime-managed.
+- Evidence is text-only and CPU-only. The small filtered retrieval test does
+  not establish general superiority, study-app quality, or device performance.
